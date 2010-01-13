@@ -18,6 +18,15 @@ $config =
   {%$config, %{$json->decode(_slurp_file("${\(basename $0)}.conf")) || {}}};
 die $json->error if !$config && $json->error;
 
+# Additional Perl modules
+if ($config->{perl5lib}) {
+    unshift @INC, $_
+      for (
+        ref $config->{perl5lib} eq 'ARRAY'
+        ? @{$config->{perl5lib}}
+        : $config->{perl5lib});
+}
+
 app->renderer->types->type(html => 'text/html; charset=utf-8');
 app->renderer->add_helper(get_last_pastes => sub { _get_last_pastes($_[0]); }
 );
