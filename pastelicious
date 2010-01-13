@@ -1,0 +1,199 @@
+#!/usr/bin/env perl
+
+use Mojolicious::Lite;
+use Mojo::ByteStream;
+use Digest::SHA1 ();
+use File::Basename;
+
+my @LANGUAGES  = (qw/Perl C Bash/);
+my $PASTES_DIR = 'pastes';
+
+app->renderer->types->type(html => 'text/html; charset=utf-8');
+app->renderer->add_helper(get_last_pastes => sub { _get_last_pastes($_[0]); }
+);
+app->renderer->add_helper(get_languages => sub {@LANGUAGES});
+
+get '/' => sub {
+    my $self = shift;
+
+    $self->render(error => {}, paste => '');
+} => 'index';
+
+post '/' => sub {
+    my $self = shift;
+
+    my $paste = $self->param('paste');
+
+    unless ($paste) {
+        $self->stash(error => {paste => 'Paste is required'});
+        $self->render;
+        return;
+    }
+
+    my $dir = $self->app->home->rel_dir($PASTES_DIR);
+    mkdir $dir unless -d $dir;
+
+    my $encoded_paste = Mojo::ByteStream->new($paste)->encode('utf-8');
+    my $id            = Digest::SHA1::sha1_hex($encoded_paste);
+
+    my $metadata = '';
+    foreach my $key (qw/author lang/) {
+        if (my $value = $self->param($key)) {
+            $metadata .= "${\(uc $key)}: $value\n";
+        }
+    }
+    $metadata .= "\n" if $metadata;
+
+    open FILE, ">:encoding(UTF-8)", "$dir/$id";
+    print FILE $metadata;
+    print FILE $paste;
+    close FILE;
+
+    $self->redirect_to('view', id => $id);
+} => 'index';
+
+get '/source' => sub {
+    my $self = shift;
+
+    $self->stash(rendered => 1);
+    $self->app->static->serve($self, '../' . basename($0));
+} => 'source';
+
+get '/:id' => sub {
+    my $self = shift;
+
+    $self->stash(error => {});
+
+    my $dir = $self->app->home->rel_dir($PASTES_DIR);
+    my $id  = $self->stash('id');
+
+    unless (-e "$dir/$id") {
+        $self->app->static->serve_404($self);
+        $self->stash(rendered => 1);
+        return;
+    }
+
+    open FILE, "<:encoding(UTF-8)", "$dir/$id";
+    my $paste = do { local $/; <FILE> };
+    close FILE;
+
+    my $metadata = _parse_metadata(\$paste);
+
+    $self->render(paste => $paste, metadata => $metadata);
+} => 'view';
+
+sub _get_last_pastes {
+    my $self = shift;
+
+    my $dir = $self->app->home->rel_dir($PASTES_DIR);
+
+    opendir DIR, $dir;
+    my @files = reverse grep { !m/^\./ } readdir DIR;
+    closedir DIR;
+
+    # We want only last 10 pastes
+    $#files = 9;
+
+    return \@files;
+}
+
+sub _parse_metadata {
+    my $string = shift;
+
+    $$string =~ s/^((.*?)(?:\n\n|\n\r\n\r|\r\r))//s;
+    return {} unless $2;
+
+    my $original = $1;
+    my $data     = $2;
+
+    my $metadata = {};
+    while ($data =~ s/^(.*?):\s*(.*?)(?:\n|\n\r|\r|$)//s) {
+        my $key   = lc $1;
+        my $value = $2;
+
+        $metadata->{$key} = $value;
+    }
+
+    unless (%$metadata) {
+        $$string = $original . $$string;
+    }
+
+    return $metadata;
+}
+
+shagadelic;
+__DATA__
+
+@@ index.html.ep
+% layout 'wrapper';
+
+@@ view.html.ep
+% layout 'wrapper';
+        <script type="text/javascript" src="/highlight/highlight.pack.js"></script>
+        <script type="text/javascript">
+            hljs.initHighlightingOnLoad();
+        </script>
+Link: <a href="<%= url_for->to_abs %>"><%= url_for->to_abs %></a><br />
+% if (my $author = $metadata->{author}) {
+Author: <%= $author %><br />
+% }
+% my $class = 'txt';
+% if (my $lang = $metadata->{lang}) {
+Language: <%= $lang %><br />
+% $class = lc $lang;
+% }
+<pre>
+<code class="<%= $class %>">
+% my @paste = split("\n", $paste); my $count = 1;
+% foreach my $line (@paste) {
+<%= $count++ %> <%== $line %>
+% }
+</code>
+</pre>
+
+@@ layouts/wrapper.html.ep
+<!doctype html>
+<html>
+    <head>
+        <title>Paste</title>
+        <link rel="stylesheet" title="GitHub" href="/highlight/styles/github.css">
+    </head>
+    <body>
+        <a href="<%= url_for 'index' %>">new paste</a>
+        <a href="<%= url_for 'source' %>">source code</a>
+        <hr />
+
+        <div style="float:left;padding-right:2em;width:10%">
+        Last pastes:
+        <ol>
+%       foreach my $id (@{get_last_pastes()}) {
+        <li><a href="<%= url_for view => id => $id %>"><%= substr($id, 0, 10) %>...</a></li>
+%       }
+        </ol>
+        </div>
+        <div style="float:right;width:80%">
+        <%== content %>
+
+        <hr />
+
+        <form method="post" action="/">
+        <table>
+        <tr><td>Author:</td><td><input type="text" name="author" value="<%= $self->tx->remote_address %>" /></td></tr>
+        <tr><td>Language:</td><td><select name="lang">
+%       foreach my $lang (get_languages) {
+        <option value="<%= $lang %>"><%= $lang %></option>
+%       }
+        </select>
+        </td></tr>
+        <tr><td></td><td>
+        <textarea name="paste" cols="80" rows="20"><%= $paste %></textarea>
+%       if ($error->{paste}) {
+        <div style="color:red"><%= $error->{paste} %></div>
+%       }
+        </td></tr>
+        <tr><td></td><td><input type="submit" value="Paste!" /> <input type="reset" value="Clear"></td></tr>
+        </table>
+        </form>
+        </div>
+    </body>
+</html>
