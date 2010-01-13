@@ -4,11 +4,19 @@ BEGIN { use FindBin; use lib "$FindBin::Bin/mojo/lib" }
 
 use Mojolicious::Lite;
 use Mojo::ByteStream;
+use Mojo::JSON;
 use Digest::SHA1 ();
 use File::Basename;
 
 my @LANGUAGES  = (qw/Perl C Bash/);
 my $PASTES_DIR = 'pastes';
+
+my $config = {server => 'cgi'};
+
+my $json = Mojo::JSON->new;
+$config =
+  {%$config, %{$json->decode(_slurp_file("${\(basename $0)}.conf")) || {}}};
+die $json->error if !$config && $json->error;
 
 app->renderer->types->type(html => 'text/html; charset=utf-8');
 app->renderer->add_helper(get_last_pastes => sub { _get_last_pastes($_[0]); }
@@ -181,7 +189,7 @@ sub _parse_metadata {
     return $metadata;
 }
 
-shagadelic;
+shagadelic(@ARGV ? @ARGV : $config->{server});
 __DATA__
 
 @@ index.html.ep
