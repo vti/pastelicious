@@ -60,7 +60,7 @@ post '/' => sub {
         close FILE;
     }
 
-    $self->redirect_to('view', head => $head, tail => $tail);
+    $self->redirect_to('view', id => $id);
 } => 'index';
 
 get '/source' => sub {
@@ -70,11 +70,11 @@ get '/source' => sub {
     $self->app->static->serve($self, '../' . basename($0));
 } => 'source';
 
-get '/:head/:tail' => sub {
+get '/:id' => sub {
     my $self = shift;
 
-    my $head = $self->stash('head');
-    my $tail = $self->stash('tail');
+    my $id = $self->stash('id');
+    my ($head, $tail) = ($id =~ m/^(..)(.*)$/);
 
     $self->stash(error => {});
 
@@ -93,13 +93,13 @@ get '/:head/:tail' => sub {
     $self->render(paste => $paste, metadata => $metadata);
 } => 'view';
 
-get '/:head/:tail/delete' => \&_delete_paste => 'delete';
+get '/:id/delete' => \&_delete_paste => 'delete';
 
 sub _delete_paste {
     my $self = shift;
 
-    my $head = $self->stash('head');
-    my $tail = $self->stash('tail');
+    my $id = $self->stash('id');
+    my ($head, $tail) = ($id =~ m/^(..)(.*)$/);
 
     my $dir = $self->app->home->rel_dir($PASTES_DIR);
     my $file = "$dir/$head/$tail";
@@ -147,7 +147,7 @@ sub _get_last_pastes {
 
     my $pastes = _slurp_file("$dir/public");
 
-    my @files = reverse split("\n", $pastes);
+    my @files = map {s{\/}{}; $_} reverse split("\n", $pastes);
 
     # We want only last 10 pastes
     $#files = 9 if $#files > 9;
@@ -196,7 +196,7 @@ __DATA__
         </script>
 Link: <a href="<%= url_for->to_abs %>"><%= url_for->to_abs %></a>
 % if ($metadata->{private}) {
-(<a href="<%= url_for delete => head => $head, tail => $tail %>">delete</a>)
+(<a href="<%= url_for delete => id => $id %>">delete</a>)
 % }
 <br />
 % if (my $author = $metadata->{author}) {
@@ -246,8 +246,7 @@ Language: <%= $lang %><br />
         Last pastes:
         <ol>
 %       foreach my $id (@{get_last_pastes()}) {
-%           my ($head, $tail) = split('/', $id);
-        <li><a href="<%= url_for view => head => $head, tail => $tail %>"><%= substr("$head$tail", 0, 10) %>...</a></li>
+        <li><a href="<%= url_for view => id => $id %>"><%= substr($id, 0, 10) %>...</a></li>
 %       }
         </ol>
         </div>
