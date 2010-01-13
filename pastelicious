@@ -16,13 +16,14 @@ app->renderer->add_helper(get_languages => sub {@LANGUAGES});
 get '/' => sub {
     my $self = shift;
 
-    $self->render(error => {}, paste => '');
+    $self->render(error => {}, paste => '', metadata => {});
 } => 'index';
 
 post '/' => sub {
     my $self = shift;
 
     my $paste = $self->param('paste');
+    $self->stash(paste => '');
 
     unless ($paste) {
         $self->stash(error => {paste => 'Paste is required'});
@@ -30,26 +31,36 @@ post '/' => sub {
         return;
     }
 
-    my $dir = $self->app->home->rel_dir($PASTES_DIR);
-    mkdir $dir unless -d $dir;
-
     my $encoded_paste = Mojo::ByteStream->new($paste)->encode('utf-8');
-    my $id            = Digest::SHA1::sha1_hex($encoded_paste);
+
+    my $id = Digest::SHA1::sha1_hex($encoded_paste);
+    my ($head, $tail) = ($id =~ m/^(..)(.*)$/);
 
     my $metadata = '';
-    foreach my $key (qw/author lang/) {
+    foreach my $key (qw/author private lang/) {
         if (my $value = $self->param($key)) {
             $metadata .= "${\(uc $key)}: $value\n";
         }
     }
     $metadata .= "\n" if $metadata;
 
-    open FILE, ">:encoding(UTF-8)", "$dir/$id";
+    my $dir = $self->app->home->rel_dir($PASTES_DIR);
+    mkdir $dir unless -d $dir;
+    mkdir "$dir/$head" unless -d "$dir/$head";
+
+    open FILE, ">:encoding(UTF-8)", "$dir/$head/$tail";
     print FILE $metadata;
     print FILE $paste;
     close FILE;
 
-    $self->redirect_to('view', id => $id);
+    # If paste is not private, save it to the public list
+    unless ($self->param('private')) {
+        open FILE, ">>:encoding(UTF-8)", "$dir/public";
+        print FILE "$head/$tail\n";
+        close FILE;
+    }
+
+    $self->redirect_to('view', head => $head, tail => $tail);
 } => 'index';
 
 get '/source' => sub {
@@ -59,40 +70,87 @@ get '/source' => sub {
     $self->app->static->serve($self, '../' . basename($0));
 } => 'source';
 
-get '/:id' => sub {
+get '/:head/:tail' => sub {
     my $self = shift;
+
+    my $head = $self->stash('head');
+    my $tail = $self->stash('tail');
 
     $self->stash(error => {});
 
     my $dir = $self->app->home->rel_dir($PASTES_DIR);
-    my $id  = $self->stash('id');
-
-    unless (-e "$dir/$id") {
+    my $file = "$dir/$head/$tail";
+    unless (-e $file) {
         $self->app->static->serve_404($self);
         $self->stash(rendered => 1);
         return;
     }
 
-    open FILE, "<:encoding(UTF-8)", "$dir/$id";
-    my $paste = do { local $/; <FILE> };
-    close FILE;
+    my $paste = _slurp_file($file);
 
     my $metadata = _parse_metadata(\$paste);
 
     $self->render(paste => $paste, metadata => $metadata);
 } => 'view';
 
+get '/:head/:tail/delete' => \&_delete_paste => 'delete';
+
+sub _delete_paste {
+    my $self = shift;
+
+    my $head = $self->stash('head');
+    my $tail = $self->stash('tail');
+
+    my $dir = $self->app->home->rel_dir($PASTES_DIR);
+    my $file = "$dir/$head/$tail";
+    unless (-e $file) {
+        $self->app->static->serve_404($self);
+        $self->stash(rendered => 1);
+        return;
+    }
+
+    my $paste = _slurp_file($file);
+    my $metadata = _parse_metadata(\$paste);
+
+    if ($metadata->{private}) {
+        unlink $file;
+
+        opendir DIR, "$dir/$head";
+        my @files = grep {!/^\./} readdir DIR;
+        closedir DIR;
+
+        # Delete directory if this paste was the last one
+        rmdir "$dir/$head" unless @files;
+
+        $self->redirect_to('index');
+    }
+    else {
+        $self->res->code(403);
+        $self->render('forbidden');
+    }
+}
+
+sub _slurp_file {
+    my $file = shift;
+
+    open FILE, "<:encoding(UTF-8)", $file or return '';
+    my $content = do { local $/; <FILE> };
+    close FILE;
+
+    return $content;
+}
+
 sub _get_last_pastes {
     my $self = shift;
 
     my $dir = $self->app->home->rel_dir($PASTES_DIR);
 
-    opendir DIR, $dir;
-    my @files = reverse grep { !m/^\./ } readdir DIR;
-    closedir DIR;
+    my $pastes = _slurp_file("$dir/public");
+
+    my @files = reverse split("\n", $pastes);
 
     # We want only last 10 pastes
-    $#files = 9;
+    $#files = 9 if $#files > 9;
 
     return \@files;
 }
@@ -127,17 +185,32 @@ __DATA__
 @@ index.html.ep
 % layout 'wrapper';
 
+@@ view.raw.ep
+<%== $paste %>
+
 @@ view.html.ep
 % layout 'wrapper';
         <script type="text/javascript" src="/highlight/highlight.pack.js"></script>
         <script type="text/javascript">
             hljs.initHighlightingOnLoad();
         </script>
-Link: <a href="<%= url_for->to_abs %>"><%= url_for->to_abs %></a><br />
+Link: <a href="<%= url_for->to_abs %>"><%= url_for->to_abs %></a>
+% if ($metadata->{private}) {
+(<a href="<%= url_for delete => head => $head, tail => $tail %>">delete</a>)
+% }
+<br />
 % if (my $author = $metadata->{author}) {
 Author: <%= $author %><br />
 % }
 % my $class = 'txt';
+Private:
+% if ($metadata->{private}) {
+Yes
+% }
+% else {
+No
+% }
+<br />
 % if (my $lang = $metadata->{lang}) {
 Language: <%= $lang %><br />
 % $class = lc $lang;
@@ -150,6 +223,12 @@ Language: <%= $lang %><br />
 % }
 </code>
 </pre>
+
+@@ forbidden.html.ep
+<!doctype html><html>
+    <head><title>Forbidden</title></head>
+    <body><h2>Forbidden</h2></body>
+</html>
 
 @@ layouts/wrapper.html.ep
 <!doctype html>
@@ -167,7 +246,8 @@ Language: <%= $lang %><br />
         Last pastes:
         <ol>
 %       foreach my $id (@{get_last_pastes()}) {
-        <li><a href="<%= url_for view => id => $id %>"><%= substr($id, 0, 10) %>...</a></li>
+%           my ($head, $tail) = split('/', $id);
+        <li><a href="<%= url_for view => head => $head, tail => $tail %>"><%= substr("$head$tail", 0, 10) %>...</a></li>
 %       }
         </ol>
         </div>
@@ -178,7 +258,8 @@ Language: <%= $lang %><br />
 
         <form method="post" action="/">
         <table>
-        <tr><td>Author:</td><td><input type="text" name="author" value="<%= $self->tx->remote_address %>" /></td></tr>
+        <tr><td>Author:</td><td><input type="text" name="author" value="<%= $metadata->{author} || $self->tx->remote_address %>" /></td></tr>
+        <tr><td>Private:</td><td><input type="checkbox" name="private" <%= 'checked="checked"' if $metadata->{private} %>/> (Won't appear in last pastes and can be deleted)</td></tr>
         <tr><td>Language:</td><td><select name="lang">
 %       foreach my $lang (get_languages) {
         <option value="<%= $lang %>"><%= $lang %></option>
