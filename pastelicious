@@ -209,36 +209,46 @@ __DATA__
 
 @@ view.html.ep
 % layout 'wrapper';
-        <script type="text/javascript" src="/highlight/highlight.pack.js"></script>
-        <script type="text/javascript">
-            hljs.initHighlightingOnLoad();
-        </script>
-Link: <a href="<%= url_for->to_abs %>"><%= url_for->to_abs %></a>
+<table width="100%">
+% if (my $author = $metadata->{author}) {
+<tr>
+<td class="label">Author:</td><td><%= $author %></td>
+</tr>
+% }
+<tr>
+<td class="label">Private:</td>
+<td><%= $metadata->{private} ? "Yes" : "No" %></td>
+</tr>
+% my $class = 'txt';
+% if (my $lang = $metadata->{lang}) {
+<tr>
+<td class="label">Language:</td>
+<td><%= $lang %></td>
+</tr>
+% $class = lc $lang;
+% }
+<tr><td class="label">Formats:</td>
+<td>
+<a href="<%= url_for->to_abs %>">html</a> 
+<a href="<%= url_for(format => 'raw')->to_abs %>">raw</a>
 % if ($metadata->{private}) {
 (<a href="<%= url_for delete => id => $id %>">delete</a>)
 % }
+</td></tr>
+</table>
 <br />
-% if (my $author = $metadata->{author}) {
-Author: <%= $author %><br />
-% }
-% my $class = 'txt';
-Private: <%= $metadata->{private} ? "Yes" : "No" %><br />
-% if (my $lang = $metadata->{lang}) {
-Language: <%= $lang %><br />
-% $class = lc $lang;
-% }
 
 % my @paste = split("\n", $paste); my $total = @paste;
-<table>
-    <tr>
-        <td style="text-align:right">
-            <pre><code><%== "$_\n" for 1 .. $total %></code></pre>
-        </td>
-        <td>
-            <pre><code class="<%= $class %>"><%= $paste %></code></pre>
-        </td>
-    </tr>
-</table>
+<div class="content">
+<div style="float:left;text-align:right">
+<pre class="lines"><code><%== "$_\n" for 1 .. $total %></code></pre>
+</div>
+<div class="float:right">
+<pre><code class="<%= $class %>"><%= $paste %></code></pre>
+</div>
+<div class="clear"></div>
+</div>
+<br />
 
 @@ forbidden.html.ep
 <!doctype html><html>
@@ -251,31 +261,43 @@ Language: <%= $lang %><br />
 <html>
     <head>
         <title>Paste</title>
-        <link rel="stylesheet" title="GitHub" href="/highlight/styles/github.css">
+        <style type="text/css">
+            html, body {height: 100%}
+            body {background: #fff;font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;}
+            h1,h2,h3,h4,h5 {font-family: times, "Times New Roman", times-roman, georgia, serif; line-height: 40px; letter-spacing: -1px; color: #444; margin: 0 0 0 0; padding: 0 0 0 0; font-weight: 100;}
+            a,a:active {color:#555}
+            a:hover{color:#000}
+            a:visited{color:#000}
+            img{border:0px}
+            pre{padding:0.5em;overflow:auto;overflow-y:visible;width:600px;}
+            pre.lines{border:0px;padding-right:0.5em;width:50px}
+            #body {width:700px;min-height:100%;height:auto !important;height:100%;margin:0 auto -6em;}
+            #header {text-align:center;padding:0em 0em 2em 0em;}
+            .content {background:#eee;border:2px solid #ccc;width:700px}
+            .created, .modified {color:#999;margin-left:10px;font-size:small;font-style:italic;padding-bottom:0.5em}
+            .modified {margin:0px}
+            .label{text-align:right;vertical-align:top;width:1%}
+            .center{text-align:center}
+            .error {padding:2em;text-align:center}
+            #footer{width:75%;margin:auto;font-size:80%;text-align:center;padding:2em 0em 2em 0em;height:2em;}
+            .push {height:6em}
+            .clear {clear:both}
+        </style>
     </head>
     <body>
-        <a href="<%= url_for 'index' %>">new paste</a>
-        <a href="<%= url_for 'source' %>">source code</a>
-        <hr />
-
-        <div style="float:left;padding-right:2em;width:10%">
-        Last pastes:
-        <ol>
-%       foreach my $id (get_last_pastes) {
-        <li><a href="<%= url_for view => id => $id %>"><%= substr($id, 0, 10) %>...</a></li>
-%       }
-        </ol>
+    <div id="body">
+        <div id="header">
+            <a href="<%= url_for 'index' %>">new paste</a>
+            <a href="<%= url_for 'source' %>">source code</a>
         </div>
-        <div style="float:right;width:80%">
+
         <%== content %>
 
-        <hr />
-
         <form method="post" action="/">
-        <table>
-        <tr><td>Author:</td><td><input type="text" name="author" value="<%= $metadata->{author} || $self->tx->remote_address %>" /></td></tr>
-        <tr><td>Private:</td><td><input type="checkbox" name="private" <%= 'checked="checked"' if $metadata->{private} %>/> (Won't appear in last pastes and can be deleted)</td></tr>
-        <tr><td>Language:</td><td><select name="lang">
+        <table width="100%">
+        <tr><td class="label">Author:</td><td><input type="text" name="author" value="<%= $metadata->{author} || $self->tx->remote_address %>" /></td></tr>
+        <tr><td class="label">Private:</td><td><input type="checkbox" name="private" <%= 'checked="checked"' if $metadata->{private} %>/> (Won't appear in last pastes and can be deleted)</td></tr>
+        <tr><td class="label">Language:</td><td><select name="lang">
 %       foreach my $lang (get_languages) {
         <option value="<%= $lang %>"><%= $lang %></option>
 %       }
@@ -288,8 +310,25 @@ Language: <%= $lang %><br />
 %       }
         </td></tr>
         <tr><td></td><td><input type="submit" value="Paste!" /> <input type="reset" value="Clear"></td></tr>
-        </table>
         </form>
+
+        <tr><td><br /></td><td></td></tr>
+        <tr>
+        <td class="label">Last pastes:</td>
+        <td>
+%       foreach my $id (get_last_pastes) {
+        <a href="<%= url_for view => id => $id %>"><%= $id %></a><br />
+%       }
+        </td>
+        </tr>
+        </table>
+
+        <div class="push"></div>
         </div>
+
+        <div class="clear">
+
+
+        <div id="footer">Powered by <a href="http://github.com/vti/pastelicious">Pastelicious!</a></div>
     </body>
 </html>
