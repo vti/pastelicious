@@ -227,14 +227,18 @@ Private: <%= $metadata->{private} ? "Yes" : "No" %><br />
 Language: <%= $lang %><br />
 % $class = lc $lang;
 % }
-<pre>
-<code class="<%= $class %>">
-% my @paste = split("\n", $paste); my $count = 1;
-% foreach my $line (@paste) {
-<%= $count++ %> <%== $line %>
-% }
-</code>
-</pre>
+
+% my @paste = split("\n", $paste); my $total = @paste;
+<table>
+    <tr>
+        <td style="text-align:right">
+            <pre><code><%== "$_\n" for 1 .. $total %></code></pre>
+        </td>
+        <td>
+            <pre><code class="<%= $class %>"><%= $paste %></code></pre>
+        </td>
+    </tr>
+</table>
 
 @@ forbidden.html.ep
 <!doctype html><html>
