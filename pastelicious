@@ -27,6 +27,8 @@ if ($config->{perl5lib}) {
         : $config->{perl5lib});
 }
 
+_load_plugins();
+
 app->renderer->types->type(html => 'text/html; charset=utf-8');
 app->renderer->add_helper(get_last_pastes => sub { _get_last_pastes($_[0]); }
 );
@@ -198,7 +200,36 @@ sub _parse_metadata {
     return $metadata;
 }
 
+sub _load_plugins {
+    my $plugins_arrayref = shift;
+
+    my $lib_dir = app->home->rel_dir('lib');
+    push @INC, $lib_dir;
+
+    my @plugins;
+
+    my $prev;
+    while (my $plugin = shift @{$config->{plugins}}) {
+        if (ref($plugin) eq 'HASH') {
+            next unless $plugins[-1];
+
+            $plugins[-1]->{args} = $plugin;
+        }
+        else {
+            push @plugins, {name => $plugin, args => {}};
+        }
+    }
+
+    push @{app->plugins->namespaces}, $_ for @{$config->{plugins_namespaces}};
+    push @{app->plugins->namespaces}, 'Pastelicious::Plugin';
+
+    foreach my $plugin (@plugins) {
+        plugin($plugin->{name} => $plugin->{args});
+    }
+}
+
 shagadelic(@ARGV ? @ARGV : $config->{server});
+
 __DATA__
 
 @@ index.html.ep
