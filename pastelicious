@@ -171,7 +171,7 @@ sub _get_last_pastes {
     # We want only last 10 pastes
     $#files = 9 if $#files > 9;
 
-    return \@files;
+    return @files;
 }
 
 sub _parse_metadata {
@@ -222,14 +222,7 @@ Link: <a href="<%= url_for->to_abs %>"><%= url_for->to_abs %></a>
 Author: <%= $author %><br />
 % }
 % my $class = 'txt';
-Private:
-% if ($metadata->{private}) {
-Yes
-% }
-% else {
-No
-% }
-<br />
+Private: <%= $metadata->{private} ? "Yes" : "No" %><br />
 % if (my $lang = $metadata->{lang}) {
 Language: <%= $lang %><br />
 % $class = lc $lang;
@@ -264,7 +257,7 @@ Language: <%= $lang %><br />
         <div style="float:left;padding-right:2em;width:10%">
         Last pastes:
         <ol>
-%       foreach my $id (@{get_last_pastes()}) {
+%       foreach my $id (get_last_pastes) {
         <li><a href="<%= url_for view => id => $id %>"><%= substr($id, 0, 10) %>...</a></li>
 %       }
         </ol>
