@@ -88,7 +88,7 @@ get '/source' => sub {
     my $self = shift;
 
     $self->stash(rendered => 1);
-    $self->app->static->serve($self, '../' . basename($0));
+    $self->render_static('../' . basename($0));
 } => 'source';
 
 get '/:id' => sub {
