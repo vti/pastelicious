@@ -1,6 +1,6 @@
-# Copyright (C) 2010, Viacheslav Tykhanovskyi
-
 #!/usr/bin/env perl
+
+# Copyright (C) 2010, Viacheslav Tykhanovskyi
 
 BEGIN { use FindBin; use lib "$FindBin::Bin/mojo/lib" }
 
@@ -92,6 +92,12 @@ get '/source' => sub {
     $self->stash(rendered => 1);
     $self->render_static('../' . basename($0));
 } => 'source';
+
+get '/rest' => sub {
+    my $self = shift;
+
+    $self->render_json({foo => 'bar'});
+};
 
 get '/:id' => sub {
     my $self = shift;
