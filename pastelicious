@@ -10,15 +10,10 @@ use Mojo::JSON;
 use Digest::SHA1 ();
 use File::Basename;
 
+my $config = plugin json_config => {default => {server => 'cgi'}};
+
 my @LANGUAGES  = (qw/Perl C Bash/);
 my $PASTES_DIR = 'pastes';
-
-my $config = {server => 'cgi'};
-
-my $json = Mojo::JSON->new;
-$config =
-  {%$config, %{$json->decode(_slurp_file("${\(basename $0)}.conf")) || {}}};
-die $json->error if !$config && $json->error;
 
 # Additional Perl modules
 if ($config->{perl5lib}) {
