@@ -115,7 +115,19 @@ get '/:id' => sub {
 
     my $metadata = _parse_metadata(\$paste);
 
-    $self->render(paste => $paste, metadata => $metadata);
+    my $format = $self->stash('format');
+
+    if ($format) {
+        if ($format eq 'json') {
+            $self->render_json({%$metadata, paste => $paste});
+        }
+        elsif ($format eq 'raw') {
+            $self->render_text($paste);
+        }
+    }
+    else {
+        $self->render(paste => $paste, metadata => $metadata);
+    }
 } => 'view';
 
 get '/:id/delete' => \&_delete_paste => 'delete';
@@ -239,9 +251,6 @@ __DATA__
 @@ index.html.ep
 % layout 'wrapper';
 
-@@ view.raw.ep
-<%== $paste %>
-
 @@ view.html.ep
 % layout 'wrapper';
 <table width="100%">
@@ -266,6 +275,7 @@ __DATA__
 <td>
 <a href="<%= url_for->to_abs %>">html</a> 
 <a href="<%= url_for(format => 'raw')->to_abs %>">raw</a>
+<a href="<%= url_for(format => 'json')->to_abs %>">json</a>
 % if ($metadata->{private}) {
 (<a href="<%= url_for delete => id => $id %>">delete</a>)
 % }
