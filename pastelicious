@@ -38,7 +38,7 @@ get '/' => sub {
     $self->render(error => {}, paste => '', metadata => {});
 } => 'index';
 
-post '/' => sub {
+post '/' => {error => {}, metadata => {}} => sub {
     my $self = shift;
 
     my $paste = $self->param('paste');
