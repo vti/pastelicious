@@ -340,7 +340,7 @@ __DATA__
 
         <form method="post" action="/">
         <table width="100%">
-        <tr><td class="label">Author:</td><td><input type="text" name="author" value="<%= $metadata->{author} || $self->tx->remote_address %>" /></td></tr>
+        <tr><td class="label">Author:</td><td><input type="text" name="author" value="<%= $metadata->{author} || $self->tx->req->headers->header('x-forwarded-for') || $self->tx->remote_address %>" /></td></tr>
         <tr><td class="label">Private:</td><td><input type="checkbox" name="private" <%= 'checked="checked"' if $metadata->{private} %>/> (Won't appear in last pastes and can be deleted)</td></tr>
         <tr><td class="label">Language:</td><td><select name="lang">
 %       foreach my $lang (get_languages) {
