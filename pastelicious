@@ -27,7 +27,7 @@ if ($config->{perl5lib}) {
 _load_plugins();
 
 app->renderer->types->type(html => 'text/html; charset=utf-8');
-app->renderer->types->type(raw  => 'text/html; charset=utf-8');
+app->renderer->types->type(raw  => 'text/plain; charset=utf-8');
 
 app->renderer->add_helper(get_last_pastes => sub { _get_last_pastes($_[0]) });
 app->renderer->add_helper(get_languages   => sub {@LANGUAGES});
