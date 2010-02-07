@@ -61,7 +61,8 @@ post '/' => {error => {}, metadata => {}} => sub {
             $metadata .= "${\(uc $key)}: $value\n";
         }
     }
-    $metadata .= "\n" if $metadata;
+    $metadata .= "\n" unless $metadata;
+    $metadata .= "\n";
 
     my $dir = $self->app->home->rel_dir($PASTES_DIR);
     mkdir $dir unless -d $dir;
