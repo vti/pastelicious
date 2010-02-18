@@ -274,9 +274,9 @@ __DATA__
 % }
 <tr><td class="label">Formats:</td>
 <td>
-<a href="<%= url_for->to_abs %>">html</a> 
-<a href="<%= url_for(format => 'raw')->to_abs %>">raw</a>
-<a href="<%= url_for(format => 'json')->to_abs %>">json</a>
+<a href="<%= url_for view => id => $id %>">html</a> 
+<a href="<%= url_for format => 'raw' %>">raw</a> 
+<a href="<%= url_for format => 'json' %>">json</a>
 % if ($metadata->{private}) {
 (<a href="<%= url_for delete => id => $id %>">delete</a>)
 % }
